@@ -11,8 +11,8 @@ use_ddp: False
 
 model_paths:
 #  - "checkpoints/cocostuff27_dino_small.ckpt"
-  - "checkpoints/cityscapes_dino_small.ckpt"
-#  - "checkpoints/potsdam_dino_vit_base.ckpt"
+ # - "checkpoints/cityscapes_dino_small.ckpt"
+   - "checkpoints/potsdam_dino_vit_base.ckpt"
 
 
 hydra:
