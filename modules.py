@@ -1,5 +1,6 @@
 import torch
 from utils import *
+import torch.nn as nn
 import torch.nn.functional as F
 import models.dino.vision_transformer as vits
 
@@ -134,6 +135,7 @@ class Projection(nn.Module):
         else:
             return feat, code
 
+
 class Prediction(nn.Module):
     def __init__(self, cfg, n_classes: int, sigma=False, n_teachers=2):
         super(Prediction, self).__init__()
@@ -142,15 +144,15 @@ class Prediction(nn.Module):
         self.n_teachers = n_teachers
 
         # Initialize student prototypes
-        self.local_clusters = nn.init.xavier_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
+        self.local_clusters = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
         self.init_global_clusters()
         self.alpha = cfg.alpha
-        
+
         # Initialize teacher prototypes
-        self.teacher_clusters = nn.ModuleList()
+        self.teacher_clusters = []
         for _ in range(n_teachers):
-            teacher_clusters = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
-            self.teacher_clusters.append(teacher_clusters)
+            teacher_cluster = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
+            self.teacher_clusters.append(teacher_cluster)
 
         if sigma:
             self.sigma = nn.Parameter(torch.Tensor(1))
@@ -160,7 +162,7 @@ class Prediction(nn.Module):
 
     def init_global_clusters(self):
         self.local_clusters.data = F.normalize(self.local_clusters, dim=1)
-        self.global_clusters = torch.nn.Parameter(self.local_clusters.data.clone())
+        self.global_clusters = nn.Parameter(self.local_clusters.data.clone())
         self.global_clusters.requires_grad = False
 
     def update_global_clusters(self):
@@ -168,7 +170,7 @@ class Prediction(nn.Module):
 
     def reset_parameters(self):
         with torch.no_grad():
-            self.local_clusters = nn.init.xavier_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
+            self.local_clusters = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
 
     def forward(self, x):
         normed_local_clusters = F.normalize(self.local_clusters, dim=1)
@@ -180,11 +182,12 @@ class Prediction(nn.Module):
 
         # Calculate scores for each teacher's prototypes
         teacher_scores = []
-        for teacher_clusters in self.teacher_clusters:
-            normed_teacher_clusters = F.normalize(teacher_clusters, dim=1)
+        for teacher_cluster in self.teacher_clusters:
+            normed_teacher_clusters = F.normalize(teacher_cluster, dim=1)
             teacher_scores.append(torch.einsum("bchw,nc->bnhw", normed_features, normed_teacher_clusters))
 
         return inner_products_local, inner_products_global, teacher_scores
+
 
 
 class FeaturePyramidNet(nn.Module):
