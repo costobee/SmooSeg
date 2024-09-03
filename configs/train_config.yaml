@@ -1,7 +1,8 @@
-output_root: '/content/outputs/'
+output_root: '/content/drive/MyDrive/output'
 data_dir: '/content/drive/MyDrive/'  # Updated path for Potsdam dataset
 experiment_name: "exp1"
-log_dir: "potsdam"  # Changed from cityscapes to potsdam
+log_dir: "loggs"  # Changed from cityscapes to potsdam
+checkpoint_dir: "checkpts"
 azureml_logging: True
 
 # Loader params
