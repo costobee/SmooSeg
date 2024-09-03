@@ -19,7 +19,7 @@ loader_crop_type: "center"
 # Model Params
 extra_clusters: 0
 model_type: "vit_base"   # "vit_base" "vit_small" "mocov2"
-arch: "dinov2"              # "dinov2"  "dino"
+arch: "dino"              # "dinov2"  "dino"
 dino_feat_type: "feat"
 projection_type: "nonlinear"
 dino_patch_size: 8
