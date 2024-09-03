@@ -14,7 +14,7 @@ use_ddp: False
  # - "checkpoints/cityscapes_dino_small.ckpt"
 #   - "checkpoints/potsdam_dino_vit_base.ckpt"
 model_paths:
-  - "/content/drive/MyDrive/potsdam_dino_vit_base.ckpt"
+  - "/content/drive/MyDrive/potsdam_dinov2_vit_base.ckpt"
 
 hydra:
   run:
