@@ -1,5 +1,5 @@
 output_root: 'outputs/'
-data_dir: '/content/drive/MyDrive/potsdam'  # Updated path for Potsdam dataset
+data_dir: '/content/drive/MyDrive/'  # Updated path for Potsdam dataset
 experiment_name: "exp1"
 log_dir: "potsdam"  # Changed from cityscapes to potsdam
 azureml_logging: True
