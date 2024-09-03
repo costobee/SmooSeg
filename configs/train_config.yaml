@@ -17,11 +17,11 @@ loader_crop_type: "center"
 
 # Model Params
 extra_clusters: 0
-model_type: "vit_small"   # "vit_base" "vit_small" "mocov2"
-arch: "dino"              # "dinov2"  "dino"
+model_type: "vit_base"   # "vit_base" "vit_small" "mocov2"
+arch: "dinov2"              # "dinov2"  "dino"
 dino_feat_type: "feat"
 projection_type: "nonlinear"
-dino_patch_size: 8
+dino_patch_size: 14
 n_feats: 384              # 2048 # 384 # 768
 dim: 64
 run_crf: False
@@ -36,9 +36,14 @@ alpha: 0.998
 pointwise: True
 seed: 0
 
-# Potsdam specific params
+# potsdam dino base
+#neg_inter_shift: 0.5
+#pos_intra_shift: 0.1
+
+# potsdam dinov2 base
 neg_inter_shift: 0.5
-pos_intra_shift: 0.1
+pos_intra_shift: 0.32
+
 
 # Logging params
 n_images: 6
