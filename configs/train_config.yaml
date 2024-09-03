@@ -54,5 +54,12 @@ hist_freq: 100                 # training data will be logged every 100 steps
 
 hydra:
   run:
-    dir: "."
-  output_subdir: ~
+    dir: "/content/drive/MyDrive/output"
+  output_subdir: "${hydra.run.dir}/${now:%Y-%m-%d_%H-%M-%S}"
+
+
+
+#hydra:
+ # run:
+  #  dir: "."
+  #output_subdir: ~
