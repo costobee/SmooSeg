@@ -46,11 +46,11 @@ pos_intra_shift: 0.32
 
 
 # Logging params
-n_images: 6
-scalar_log_freq: 10
-checkpoint_freq: 400
-val_freq: 400
-hist_freq: 100
+n_images: 6               # number of images to use for logging
+scalar_log_freq: 10         # how frequently scalar values (such as loss or accuracy metrics) are logged
+checkpoint_freq: 400         #how often (in terms of steps or iterations) the model’s state (weights and optimizer state) should be saved as a checkpoint
+val_freq: 400                 #how frequently the model’s performance should be evaluated on a validation set
+hist_freq: 100                 # training data will be logged every 100 steps
 
 hydra:
   run:
