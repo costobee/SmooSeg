@@ -14,7 +14,7 @@ class DinoFeaturizer(nn.Module):    #  a neural network model DinoFeaturizer
         self.patch_size = patch_size
         self.feat_type = self.cfg.dino_feat_type
         arch = self.cfg.model_type
-        self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0)
+        self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0) # Sets the number of classes to 0, indicating this model is not being used for classification but for feature extraction
         for p in self.model.parameters():
             p.requires_grad = False
         self.model.eval()
