@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import models.dino.vision_transformer as vits
 
-class DinoFeaturizer(nn.Module):
+class DinoFeaturizer(nn.Module):    #  a neural network model DinoFeaturizer
 
     def __init__(self, dim, cfg):
         super().__init__()
