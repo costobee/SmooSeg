@@ -1,22 +1,22 @@
 import torch
-from utils import *
+from utils import *                 # want all utils file
 import torch.nn.functional as F
-import models.dino.vision_transformer as vits
+import models.dino.vision_transformer as vits     #getting dino model
 
 class DinoFeaturizer(nn.Module):
 
     def __init__(self, dim, cfg):
         super().__init__()
         self.cfg = cfg
-        self.dim = dim
+        self.dim = dim         # dimensions of output feature
         patch_size = self.cfg.dino_patch_size
         self.patch_size = patch_size
         self.feat_type = self.cfg.dino_feat_type
         arch = self.cfg.model_type
-        self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0)
-        for p in self.model.parameters():
+        self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0)       # num_classes=0 means for feature extraction
+        for p in self.model.parameters():        # freezing model parameters--no updation during training
             p.requires_grad = False
-        self.model.eval()
+        self.model.eval()    #sets the model to evaluation mode
 
         if arch == "vit_small" and patch_size == 16:
             url = "dino_deitsmall16_pretrain/dino_deitsmall16_pretrain.pth"
