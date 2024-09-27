@@ -136,6 +136,7 @@ class Projection(nn.Module):
             return feat, code
 
 
+
 class Prediction(nn.Module):
     def __init__(self, cfg, n_classes: int, sigma=False, n_teachers=2):
         super(Prediction, self).__init__()
@@ -148,7 +149,7 @@ class Prediction(nn.Module):
         self.init_global_clusters()
         self.alpha = cfg.alpha
 
-        # Initialize teacher prototypes
+        # Initialize teacher prototypes as a ParameterList
         self.teacher_clusters = nn.ParameterList([
             nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim))) for _ in range(n_teachers)
         ])
@@ -176,7 +177,8 @@ class Prediction(nn.Module):
         device = x.device
         self.local_clusters = self.local_clusters.to(device)
         self.global_clusters = self.global_clusters.to(device)
-        self.teacher_clusters = [tc.to(device) for tc in self.teacher_clusters]
+        # No need to move teacher_clusters here, since they are already nn.ParameterList
+        # self.teacher_clusters = [tc.to(device) for tc in self.teacher_clusters]
 
         # Normalize clusters and features
         normed_local_clusters = F.normalize(self.local_clusters, dim=1)
@@ -194,6 +196,7 @@ class Prediction(nn.Module):
             teacher_scores.append(torch.einsum("bchw,nc->bnhw", normed_features, normed_teacher_clusters))
 
         return inner_products_local, inner_products_global, teacher_scores
+
 
 
 
