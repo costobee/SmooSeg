@@ -73,7 +73,7 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
 
         feats, code = self.projection(feats1)
 
-        inner_products_local, inner_products_global = self.prediction(code)
+        inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
 
         smooth_loss, data_loss, pos_intra_cd, neg_inter_cd = self.energy_minimization_loss(feats,
                                                                inner_products_local,
