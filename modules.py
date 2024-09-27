@@ -277,14 +277,14 @@ class Energy_minimization_loss(nn.Module):
         data_loss = F.cross_entropy(flat_logits, flat_target, reduction='none')
 
         # Compute smooth loss
-        smooth_loss = self.smooth_loss(signal, avg_teacher_probs)
+        smooth_loss, pos_intra_cd, neg_inter_cd, data_loss = self.smooth_loss(signal, avg_teacher_probs)
 
         # Placeholder logic for pos_intra_cd and neg_inter_cd
         # You should replace these with your actual computation
-        pos_intra_cd = torch.mean(data_loss)  # Example: average of data loss for positive intra class distance
-        neg_inter_cd = torch.mean(data_loss)  # Example: average of data loss for negative inter class distance
+        #pos_intra_cd = torch.mean(data_loss)  # Example: average of data loss for positive intra class distance
+        #neg_inter_cd = torch.mean(data_loss)  # Example: average of data loss for negative inter class distance
 
-        return smooth_loss, data_loss.mean(), pos_intra_cd, neg_inter_cd
+        return smooth_loss, data_loss, pos_intra_cd, neg_inter_cd
 
 
 
