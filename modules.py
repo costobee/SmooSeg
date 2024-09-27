@@ -149,10 +149,9 @@ class Prediction(nn.Module):
         self.alpha = cfg.alpha
 
         # Initialize teacher prototypes
-        self.teacher_clusters = []
-        for _ in range(n_teachers):
-            teacher_cluster = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
-            self.teacher_clusters.append(teacher_cluster)
+        self.teacher_clusters = nn.ParameterList([
+            nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim))) for _ in range(n_teachers)
+        ])
 
         if sigma:
             self.sigma = nn.Parameter(torch.Tensor(1))
@@ -173,10 +172,18 @@ class Prediction(nn.Module):
             self.local_clusters = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
 
     def forward(self, x):
+        # Move clusters to the same device as input x
+        device = x.device
+        self.local_clusters = self.local_clusters.to(device)
+        self.global_clusters = self.global_clusters.to(device)
+        self.teacher_clusters = [tc.to(device) for tc in self.teacher_clusters]
+
+        # Normalize clusters and features
         normed_local_clusters = F.normalize(self.local_clusters, dim=1)
         normed_global_clusters = F.normalize(self.global_clusters, dim=1)
         normed_features = F.normalize(x, dim=1)
 
+        # Compute inner products
         inner_products_local = torch.einsum("bchw,nc->bnhw", normed_features.detach(), normed_local_clusters)
         inner_products_global = torch.einsum("bchw,nc->bnhw", normed_features, normed_global_clusters.detach())
 
