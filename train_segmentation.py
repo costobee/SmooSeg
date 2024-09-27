@@ -120,10 +120,11 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
 
             code = F.interpolate(code, label.shape[-2:], mode='bilinear', align_corners=False)
 
+        # Unpack correctly
             inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
 
-
-            cluster_probs = torch.log_softmax(products * 2, dim=1)
+        # Use inner_products_global instead of products
+            cluster_probs = torch.log_softmax(inner_products_global * 2, dim=1)
             cluster_preds = cluster_probs.argmax(1)
 
             self.cluster_metrics.update(cluster_preds, label)
@@ -131,7 +132,9 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
             return {
                 'img': img[:self.cfg.n_images].detach().cpu(),
                 "cluster_preds": cluster_preds[:self.cfg.n_images].detach().cpu(),
-                "label": label[:self.cfg.n_images].detach().cpu()}
+                "label": label[:self.cfg.n_images].detach().cpu()
+            }
+
 
     def on_validation_epoch_end(self) -> None:
         super().on_validation_epoch_end()
@@ -161,8 +164,12 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
                 feats = self.net(img)
                 _, code = self.projection(feats)
                 code = F.interpolate(code, label.shape[-2:], mode='bilinear', align_corners=False)
-                _, products = self.prediction(code)
-                cluster_probs = torch.log_softmax(products * 2, dim=1)
+            
+            # Unpack correctly
+                inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
+
+            # Use inner_products_global instead of products
+                cluster_probs = torch.log_softmax(inner_products_global * 2, dim=1)
                 cluster_preds = batched_crf(pool, img, cluster_probs).argmax(1).cuda()
 
                 self.test_cluster_metrics.update(cluster_preds, label)
