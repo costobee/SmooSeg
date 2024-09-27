@@ -257,6 +257,7 @@ def super_perm(size: int, device: torch.device):
     return perm % size
 
 
+
 class Energy_minimization_loss(nn.Module):
     def __init__(self, cfg, n_classes):
         super(Energy_minimization_loss, self).__init__()
@@ -268,7 +269,7 @@ class Energy_minimization_loss(nn.Module):
         # Aggregate teacher prototypes
         teacher_probs = [torch.softmax(score / temperature, dim=1) for score in teacher_scores]
         avg_teacher_probs = torch.mean(torch.stack(teacher_probs), dim=0)
-        
+
         # Compute data loss using average teacher probabilities
         target = torch.argmax(inner_products_global, dim=1)
         flat_logits = inner_products_local.permute(0, 2, 3, 1).reshape(-1, self.n_classes)
@@ -278,7 +279,14 @@ class Energy_minimization_loss(nn.Module):
         # Compute smooth loss
         smooth_loss = self.smooth_loss(signal, avg_teacher_probs)
 
-        return smooth_loss, data_loss.mean()
+        # Placeholder logic for pos_intra_cd and neg_inter_cd
+        # You should replace these with your actual computation
+        pos_intra_cd = torch.mean(data_loss)  # Example: average of data loss for positive intra class distance
+        neg_inter_cd = torch.mean(data_loss)  # Example: average of data loss for negative inter class distance
+
+        return smooth_loss, data_loss.mean(), pos_intra_cd, neg_inter_cd
+
+
 
 class ContrastiveCorrelationLoss(nn.Module):
     def __init__(self, cfg):
