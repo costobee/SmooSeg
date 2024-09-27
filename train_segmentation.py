@@ -120,7 +120,8 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
 
             code = F.interpolate(code, label.shape[-2:], mode='bilinear', align_corners=False)
 
-            _, products = self.prediction(code)
+            inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
+
 
             cluster_probs = torch.log_softmax(products * 2, dim=1)
             cluster_preds = cluster_probs.argmax(1)
