@@ -286,6 +286,3 @@ class ContrastiveCorrelationLoss(nn.Module):
         neg_inter_loss, neg_inter_cd = self.helper(orig_feats, feats_neg, orig_code, code_neg, self.cfg.neg_inter_shift)
 
         return pos_intra_loss.mean(), pos_intra_cd.mean(), neg_inter_loss.mean(), neg_inter_cd.mean()
-
-
-
