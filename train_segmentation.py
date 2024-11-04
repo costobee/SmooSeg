@@ -73,12 +73,11 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
 
         feats, code = self.projection(feats1)
 
-        inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
+        inner_products_local, inner_products_global = self.prediction(code)
 
         smooth_loss, data_loss, pos_intra_cd, neg_inter_cd = self.energy_minimization_loss(feats,
                                                                inner_products_local,
                                                                inner_products_global,
-                                                               teacher_scores,
                                                                temperature=self.cfg.temperature
                                                                )
         loss = smooth_loss + data_loss
@@ -121,11 +120,9 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
 
             code = F.interpolate(code, label.shape[-2:], mode='bilinear', align_corners=False)
 
-        # Unpack correctly
-            inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
+            _, products = self.prediction(code)
 
-        # Use inner_products_global instead of products
-            cluster_probs = torch.log_softmax(inner_products_global * 2, dim=1)
+            cluster_probs = torch.log_softmax(products * 2, dim=1)
             cluster_preds = cluster_probs.argmax(1)
 
             self.cluster_metrics.update(cluster_preds, label)
@@ -133,9 +130,7 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
             return {
                 'img': img[:self.cfg.n_images].detach().cpu(),
                 "cluster_preds": cluster_preds[:self.cfg.n_images].detach().cpu(),
-                "label": label[:self.cfg.n_images].detach().cpu()
-            }
-
+                "label": label[:self.cfg.n_images].detach().cpu()}
 
     def on_validation_epoch_end(self) -> None:
         super().on_validation_epoch_end()
@@ -165,12 +160,8 @@ class LitUnsupervisedSegmenter(pl.LightningModule):
                 feats = self.net(img)
                 _, code = self.projection(feats)
                 code = F.interpolate(code, label.shape[-2:], mode='bilinear', align_corners=False)
-            
-            # Unpack correctly
-                inner_products_local, inner_products_global, teacher_scores = self.prediction(code)
-
-            # Use inner_products_global instead of products
-                cluster_probs = torch.log_softmax(inner_products_global * 2, dim=1)
+                _, products = self.prediction(code)
+                cluster_probs = torch.log_softmax(products * 2, dim=1)
                 cluster_preds = batched_crf(pool, img, cluster_probs).argmax(1).cuda()
 
                 self.test_cluster_metrics.update(cluster_preds, label)
@@ -192,8 +183,8 @@ def my_app(cfg: DictConfig) -> None:
     OmegaConf.set_struct(cfg, False)
     print(OmegaConf.to_yaml(cfg))
     data_dir = cfg.data_dir
-    log_dir = join(cfg.output_root, "loggs")
-    checkpoint_dir = join(cfg.output_root, "checkpts")
+    log_dir = join(cfg.output_root, "logs")
+    checkpoint_dir = join(cfg.output_root, "checkpoints")
 
     prefix = "{}/{}_{}".format(cfg.log_dir, cfg.dataset_name, cfg.experiment_name)
     name = '{}_date_{}'.format(prefix, datetime.now().strftime('%b%d_%H-%M-%S'))
