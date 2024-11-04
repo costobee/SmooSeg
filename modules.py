@@ -1,10 +1,9 @@
 import torch
 from utils import *
-import torch.nn as nn
 import torch.nn.functional as F
 import models.dino.vision_transformer as vits
 
-class DinoFeaturizer(nn.Module):    #  a neural network model DinoFeaturizer
+class DinoFeaturizer(nn.Module):
 
     def __init__(self, dim, cfg):
         super().__init__()
@@ -14,7 +13,7 @@ class DinoFeaturizer(nn.Module):    #  a neural network model DinoFeaturizer
         self.patch_size = patch_size
         self.feat_type = self.cfg.dino_feat_type
         arch = self.cfg.model_type
-        self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0) # Sets the number of classes to 0, indicating this model is not being used for classification but for feature extraction
+        self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0)
         for p in self.model.parameters():
             p.requires_grad = False
         self.model.eval()
@@ -135,25 +134,17 @@ class Projection(nn.Module):
         else:
             return feat, code
 
-
-
 class Prediction(nn.Module):
-    def __init__(self, cfg, n_classes: int, sigma=False, n_teachers=2):
+
+    def __init__(self, cfg, n_classes: int, sigma=False):
         super(Prediction, self).__init__()
         self.n_classes = n_classes
         self.dim = cfg.dim
-        self.n_teachers = n_teachers
-
-        # Initialize student prototypes
-        self.local_clusters = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
+        # self.local_clusters = nn.init.kaiming_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
+        # self.local_clusters = nn.init.orthogonal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
+        self.local_clusters = nn.init.xavier_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
         self.init_global_clusters()
         self.alpha = cfg.alpha
-
-        # Initialize teacher prototypes as a ParameterList
-        self.teacher_clusters = nn.ParameterList([
-            nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim))) for _ in range(n_teachers)
-        ])
-
         if sigma:
             self.sigma = nn.Parameter(torch.Tensor(1))
             self.sigma.data.fill_(1)
@@ -162,7 +153,7 @@ class Prediction(nn.Module):
 
     def init_global_clusters(self):
         self.local_clusters.data = F.normalize(self.local_clusters, dim=1)
-        self.global_clusters = nn.Parameter(self.local_clusters.data.clone())
+        self.global_clusters = torch.nn.Parameter(self.local_clusters.data.clone())
         self.global_clusters.requires_grad = False
 
     def update_global_clusters(self):
@@ -170,35 +161,20 @@ class Prediction(nn.Module):
 
     def reset_parameters(self):
         with torch.no_grad():
-            self.local_clusters = nn.Parameter(nn.init.xavier_normal_(torch.randn(self.n_classes, self.dim)))
+            self.local_clusters = nn.init.xavier_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
 
     def forward(self, x):
-        # Move clusters to the same device as input x
-        device = x.device
-        self.local_clusters = self.local_clusters.to(device)
-        self.global_clusters = self.global_clusters.to(device)
-        # No need to move teacher_clusters here, since they are already nn.ParameterList
-        # self.teacher_clusters = [tc.to(device) for tc in self.teacher_clusters]
-
-        # Normalize clusters and features
         normed_local_clusters = F.normalize(self.local_clusters, dim=1)
         normed_global_clusters = F.normalize(self.global_clusters, dim=1)
         normed_features = F.normalize(x, dim=1)
 
-        # Compute inner products
         inner_products_local = torch.einsum("bchw,nc->bnhw", normed_features.detach(), normed_local_clusters)
         inner_products_global = torch.einsum("bchw,nc->bnhw", normed_features, normed_global_clusters.detach())
 
-        # Calculate scores for each teacher's prototypes
-        teacher_scores = []
-        for teacher_cluster in self.teacher_clusters:
-            normed_teacher_clusters = F.normalize(teacher_cluster, dim=1)
-            teacher_scores.append(torch.einsum("bchw,nc->bnhw", normed_features, normed_teacher_clusters))
+        if self.sigma is not None:
+            inner_products_local = self.sigma * inner_products_local
 
-        return inner_products_local, inner_products_global, teacher_scores
-
-
-
+        return inner_products_local, inner_products_global
 
 class FeaturePyramidNet(nn.Module):
     def __init__(self, cut_model):
@@ -257,7 +233,6 @@ def super_perm(size: int, device: torch.device):
     return perm % size
 
 
-
 class Energy_minimization_loss(nn.Module):
     def __init__(self, cfg, n_classes):
         super(Energy_minimization_loss, self).__init__()
@@ -265,54 +240,49 @@ class Energy_minimization_loss(nn.Module):
         self.n_classes = n_classes
         self.smooth_loss = ContrastiveCorrelationLoss(cfg)
 
-    def forward(self, signal, inner_products_local, inner_products_global, teacher_scores, temperature=0.1):
-        # Aggregate teacher prototypes
-        teacher_probs = [torch.softmax(score / temperature, dim=1) for score in teacher_scores]
-        avg_teacher_probs = torch.mean(torch.stack(teacher_probs), dim=0)
+    def forward(self, signal, inner_products_local, inner_products_global, temperature=0.1):
+        cluster_probs = torch.softmax(inner_products_global / temperature, dim=1)
+        pos_intra_loss, pos_intra_cd, neg_inter_loss, neg_inter_cd = self.smooth_loss(signal, cluster_probs)
+        smooth_loss = pos_intra_loss + neg_inter_loss
 
-        # Compute data loss using average teacher probabilities
+        # cluster_probs_global = F.one_hot(torch.argmax(inner_products_global, dim=1), self.n_classes) \
+        #     .permute(0, 3, 1, 2).to(torch.float32)
+        # data_loss = -(cluster_probs_global * inner_products_local).sum(1).mean()
+
         target = torch.argmax(inner_products_global, dim=1)
+
         flat_logits = inner_products_local.permute(0, 2, 3, 1).reshape(-1, self.n_classes)
         flat_target = target.reshape(-1)
+
         data_loss = F.cross_entropy(flat_logits, flat_target, reduction='none')
 
-        # Compute smooth loss
-        smooth_loss, pos_intra_cd, neg_inter_cd, data_loss = self.smooth_loss(signal, avg_teacher_probs)
-
-        # Placeholder logic for pos_intra_cd and neg_inter_cd
-        # You should replace these with your actual computation
-        #pos_intra_cd = torch.mean(data_loss)  # Example: average of data loss for positive intra class distance
-        #neg_inter_cd = torch.mean(data_loss)  # Example: average of data loss for negative inter class distance
-
-        return smooth_loss, data_loss, pos_intra_cd, neg_inter_cd
-
-
+        return smooth_loss, data_loss.mean(), pos_intra_cd, neg_inter_cd
 
 class ContrastiveCorrelationLoss(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, ):
         super(ContrastiveCorrelationLoss, self).__init__()
         self.cfg = cfg
 
     def helper(self, f1, f2, c1, c2, shift):
         with torch.no_grad():
             fd = tensor_correlation(norm(f1), norm(f2))
+
             if self.cfg.pointwise:
                 old_mean = fd.mean()
                 fd -= fd.mean([3, 4], keepdim=True)
                 fd = fd - fd.mean() + old_mean
+
         cd = 1 - tensor_correlation(norm(c1), norm(c2))
         loss = (fd - shift) * cd
+
         return loss, cd
 
-    def forward(self, orig_feats: torch.Tensor, cluster_probs: torch.Tensor):
+    def forward(self, orig_feats: torch.Tensor, orig_code: torch.Tensor):
         perm_neg = super_perm(orig_feats.size(0), orig_feats.device)
         feats_neg = orig_feats[perm_neg]
-        cluster_probs_neg = cluster_probs[perm_neg]
+        code_neg = orig_code[perm_neg]
 
-        pos_intra_loss, pos_intra_cd = self.helper(orig_feats, orig_feats, cluster_probs, cluster_probs, self.cfg.pos_intra_shift)
-        neg_inter_loss, neg_inter_cd = self.helper(orig_feats, feats_neg, cluster_probs, cluster_probs_neg, self.cfg.neg_inter_shift)
+        pos_intra_loss, pos_intra_cd = self.helper(orig_feats, orig_feats, orig_code, orig_code, self.cfg.pos_intra_shift)
+        neg_inter_loss, neg_inter_cd = self.helper(orig_feats, feats_neg, orig_code, code_neg, self.cfg.neg_inter_shift)
 
         return pos_intra_loss.mean(), pos_intra_cd.mean(), neg_inter_loss.mean(), neg_inter_cd.mean()
-
-
-
