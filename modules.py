@@ -8,7 +8,7 @@ class DinoFeaturizer(nn.Module):
     def __init__(self, dim, cfg):
         super().__init__()
         self.cfg = cfg
-        self.dim = dim
+        self.dim = dim     # dimensionality of the output feature vector
         patch_size = self.cfg.dino_patch_size
         self.patch_size = patch_size
         self.feat_type = self.cfg.dino_feat_type
@@ -16,7 +16,7 @@ class DinoFeaturizer(nn.Module):
         self.model = vits.__dict__[arch](patch_size=patch_size, num_classes=0)
         for p in self.model.parameters():
             p.requires_grad = False
-        self.model.eval()
+        self.model.eval()    #  dropout is turned off and batch normalization uses the learned statistics rather than the batch-specific statistics
 
         if arch == "vit_small" and patch_size == 16:
             url = "dino_deitsmall16_pretrain/dino_deitsmall16_pretrain.pth"
@@ -37,18 +37,18 @@ class DinoFeaturizer(nn.Module):
     def forward(self, img, n=1, return_class_feat=False):
         self.model.eval()
         with torch.no_grad():
-            assert (img.shape[2] % self.patch_size == 0)
+            assert (img.shape[2] % self.patch_size == 0)    # height (img.shape[2]) and width (img.shape[3]) of the input image are divisible by the patch size
             assert (img.shape[3] % self.patch_size == 0)
 
             # get selected layer activations
-            feat, attn, qkv = self.model.get_intermediate_feat(img, n=n)
+            feat, attn, qkv = self.model.get_intermediate_feat(img, n=n)   # n indicates which layer’s output to extract
             feat, attn, qkv = feat[0], attn[0], qkv[0]
 
             feat_h = img.shape[2] // self.patch_size
             feat_w = img.shape[3] // self.patch_size
 
-            if self.feat_type == "feat":
-                image_feat = feat[:, 1:, :].reshape(feat.shape[0], feat_h, feat_w, -1).permute(0, 3, 1, 2).contiguous()
+            if self.feat_type == "feat":       # output should be the image features extracted from the intermediate activations. feat(batch_size, num_tokens, feature_dim)
+                image_feat = feat[:, 1:, :].reshape(feat.shape[0], feat_h, feat_w, -1).permute(0, 3, 1, 2).contiguous()  # selecting all tokens except class token, reshaping to 4D tensor (batch_size, feature_dim, feat_h, feat_w)
             elif self.feat_type == "KK":
                 image_k = qkv[1, :, :, 1:, :].reshape(feat.shape[0], 6, feat_h, feat_w, -1)
                 B, H, I, J, D = image_k.shape
@@ -111,7 +111,7 @@ class Projection(nn.Module):
 
     def make_clusterer(self, in_channels):
         return torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels, self.dim, (1, 1))
+            torch.nn.Conv2d(in_channels, self.dim, (1, 1))   # reducing channels of in_channels to dim using conv of kernel size 1*1
         )
 
     def make_nonlinear_clusterer(self, in_channels):
@@ -123,22 +123,22 @@ class Projection(nn.Module):
 
     def forward(self, feat):
         if self.proj_type is not None:
-            code = self.cluster1(self.dropout(feat))
+            code = self.cluster1(self.dropout(feat))    # making a linear cluster code from feat
             if self.proj_type == "nonlinear":
-                code += self.cluster2(self.dropout(feat))
+                code += self.cluster2(self.dropout(feat))    # cluster2 is added to the output of cluster1.
         else:
             code = feat
 
         if self.cfg.dropout:
-            return self.dropout(feat), code
+            return self.dropout(feat), code     # (dropped_feat, code)
         else:
             return feat, code
 
 class Prediction(nn.Module):
 
-    def __init__(self, cfg, n_classes: int, sigma=False):
-        super(Prediction, self).__init__()
-        self.n_classes = n_classes
+    def __init__(self, cfg, n_classes: int, sigma=False):     # output classes for the model
+        super(Prediction, self).__init__()        # parent class
+        self.n_classes = n_classes               # came from data.py
         self.dim = cfg.dim
         # self.local_clusters = nn.init.kaiming_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
         # self.local_clusters = nn.init.orthogonal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
@@ -149,7 +149,7 @@ class Prediction(nn.Module):
             self.sigma = nn.Parameter(torch.Tensor(1))
             self.sigma.data.fill_(1)
         else:
-            self.register_parameter('sigma', None)
+            self.register_parameter('sigma', None)    # no such parameter(sigma) is included
 
     def init_global_clusters(self):
         self.local_clusters.data = F.normalize(self.local_clusters, dim=1)
