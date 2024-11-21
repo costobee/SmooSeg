@@ -159,16 +159,16 @@ class Prediction(nn.Module):
     def update_global_clusters(self):
         self.global_clusters.data = self.alpha * self.global_clusters.data + (1 - self.alpha) * self.local_clusters.data
 
-    def reset_parameters(self):
+    def reset_parameters(self):              # if needed 
         with torch.no_grad():
-            self.local_clusters = nn.init.xavier_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))
+            self.local_clusters = nn.init.xavier_normal_(torch.nn.Parameter(torch.randn(self.n_classes, self.dim)))    #local_clusters parameter is replaced with the newly initialized tensor.
 
     def forward(self, x):
         normed_local_clusters = F.normalize(self.local_clusters, dim=1)
         normed_global_clusters = F.normalize(self.global_clusters, dim=1)
         normed_features = F.normalize(x, dim=1)
 
-        inner_products_local = torch.einsum("bchw,nc->bnhw", normed_features.detach(), normed_local_clusters)
+        inner_products_local = torch.einsum("bchw,nc->bnhw", normed_features.detach(), normed_local_clusters)    #gradients are not calculated for the input feature map during this computation
         inner_products_global = torch.einsum("bchw,nc->bnhw", normed_features, normed_global_clusters.detach())
 
         if self.sigma is not None:
